@@ -115,4 +115,4 @@ GHL sends form fields using these keys. Make sure your form fields match:
 
 ## Author
 
-Built by Jimmie as part of an AI automation portfolio targeting roles in AI engineering and workflow automation.
+Built by Jimmie as part of an AI automation portfolio (AI engineering and workflow automation).
