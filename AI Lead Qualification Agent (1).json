@@ -1,0 +1,380 @@
+{
+  "name": "AI Lead Qualification Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-qualifier",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "07d475a8-7796-4a28-8aef-c29e963c88d3",
+      "name": "Webhook",
+      "webhookId": "YOUR_WEBHOOK_ID"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "31315334-4689-4d20-89bf-073af1310044",
+              "name": "name",
+              "value": "={{ $json.body.Name }}",
+              "type": "string"
+            },
+            {
+              "id": "62bea894-bbe0-4259-b38a-12bed661330e",
+              "name": "email",
+              "value": "={{ $json.body.email }}",
+              "type": "string"
+            },
+            {
+              "id": "db261f08-2e87-436c-9f49-b580fb415871",
+              "name": "business",
+              "value": "={{ $json.body['Business Name'] }}",
+              "type": "string"
+            },
+            {
+              "id": "abbf307c-311a-42f9-87ba-0da63303ad10",
+              "name": "message",
+              "value": "={{ $json.body.Message }}",
+              "type": "string"
+            },
+            {
+              "id": "cedb1ba2-069e-4f47-8a37-a86dde89542e",
+              "name": "source",
+              "value": "=GHL Form",
+              "type": "string"
+            },
+            {
+              "id": "fc08d34e-b31d-46ee-8e84-178388a162cf",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "2d2639b7-3d80-42e3-b7ee-e3ceaad91d88",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "YOUR_CLAUDE_API_KEY"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-haiku-4-5-20251001\",\n  \"max_tokens\": 500,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a lead qualification specialist. Analyze this inbound lead and return ONLY a JSON object — no other text.\\n\\nLead info:\\nName: {{ $json.name }}\\nBusiness: {{ $json.business }}\\nMessage: {{ $json.message }}\\nSource: {{ $json.source }}\\n\\nReturn this exact JSON structure:\\n{\\n  \\\"score\\\": <integer 1-10>,\\n  \\\"tier\\\": <\\\"hot\\\" | \\\"warm\\\" | \\\"cold\\\">,\\n  \\\"reason\\\": <one sentence explaining the score>,\\n  \\\"suggested_action\\\": <one clear next step>\\n}\\n\\nScoring guide:\\n8-10 = Hot\\n5-7 = Warm\\n1-4 = Cold\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        416,
+        0
+      ],
+      "id": "746224fc-9df1-464a-8510-23083284553e",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cb4fcd13-5d93-44ff-9199-3415c3b9b96c",
+              "leftValue": "={{ $json.score }}",
+              "rightValue": 7,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        832,
+        0
+      ],
+      "id": "157d0910-d9a2-4c18-b14b-26adfe7a4f73",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#hot-leads",
+          "mode": "name"
+        },
+        "text": "=🔥 *New Hot Lead — ({{ $json.score }}/10)*\n───────────────────────────\n👤 *{{ $json.name }}*\n🏢 {{ $json.business }}\n📧 {{ $json.email }}\n\n💬 _\"{{ $json.message }}\"_\n\n🧠 *Why:* {{ $json.reason }}\n⚡ *Action:* {{ $json.suggested_action }}\n───────────────────────────\n🕐 {{ $json.timestamp }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1040,
+        -96
+      ],
+      "id": "b65ee243-365c-4036-b931-0b1b0dee1d33",
+      "name": "Send a message",
+      "webhookId": "YOUR_SLACK_WEBHOOK_ID"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Lead Qualifier — Portfolio",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $('Code').item.json.timestamp }}",
+            "Name": "={{ $('Code').item.json.name }}",
+            "Email": "={{ $('Code').item.json.email }}",
+            "Business": "={{ $('Code').item.json.business }}",
+            "Message": "={{ $('Code').item.json.message }}",
+            "Score": "={{ $('Code').item.json.score }}",
+            "Tier": "={{ $('Code').item.json.tier }}",
+            "Reason": "={{ $('Code').item.json.reason }}",
+            "Suggested Action": "={{ $('Code').item.json.suggested_action }}"
+          },
+          "matchingColumns": [
+            "Timestamp"
+          ],
+          "schema": [
+            { "id": "Timestamp", "displayName": "Timestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Name", "displayName": "Name", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Email", "displayName": "Email", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Business", "displayName": "Business", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Message", "displayName": "Message", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Score", "displayName": "Score", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Tier", "displayName": "Tier", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Reason", "displayName": "Reason", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Suggested Action", "displayName": "Suggested Action", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1248,
+        -96
+      ],
+      "id": "3e36a230-68a0-4d4c-af03-666c8b4d8b2f",
+      "name": "Append row in sheet"
+    },
+    {
+      "parameters": {
+        "jsCode": "const claudeResponse = $input.item.json.content[0].text;\n\nlet qualification;\ntry {\n  const clean = claudeResponse.replace(/```json\\n?|\\n?```/g, '').trim();\n  qualification = JSON.parse(clean);\n} catch (e) {\n  const match = claudeResponse.match(/\\{[\\s\\S]*\\}/);\n  qualification = JSON.parse(match[0]);\n}\n\nreturn {\n  json: {\n    name: $('Edit Fields').item.json.name,\n    email: $('Edit Fields').item.json.email,\n    business: $('Edit Fields').item.json.business,\n    message: $('Edit Fields').item.json.message,\n    source: $('Edit Fields').item.json.source,\n    timestamp: $('Edit Fields').item.json.timestamp,\n    score: qualification.score,\n    tier: qualification.tier,\n    reason: qualification.reason,\n    suggested_action: qualification.suggested_action\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        0
+      ],
+      "id": "65596bdc-8044-4210-a335-8b3006d7151b",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Lead Qualifier — Portfolio",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $('Code').item.json.timestamp }}",
+            "Name": "={{ $('Code').item.json.name }}",
+            "Email": "={{ $('Code').item.json.email }}",
+            "Business": "={{ $('Code').item.json.business }}",
+            "Message": "={{ $('Code').item.json.message }}",
+            "Score": "={{ $('Code').item.json.score }}",
+            "Tier": "={{ $('Code').item.json.tier }}",
+            "Reason": "={{ $('Code').item.json.reason }}",
+            "Suggested Action": "={{ $('Code').item.json.suggested_action }}"
+          },
+          "matchingColumns": [
+            "Timestamp"
+          ],
+          "schema": [
+            { "id": "Timestamp", "displayName": "Timestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Name", "displayName": "Name", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Email", "displayName": "Email", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Business", "displayName": "Business", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Message", "displayName": "Message", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Score", "displayName": "Score", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Tier", "displayName": "Tier", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Reason", "displayName": "Reason", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Suggested Action", "displayName": "Suggested Action", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1040,
+        96
+      ],
+      "id": "48296c4e-abe1-49ca-b62a-7103976c9608",
+      "name": "Append row in sheet1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Append row in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "YOUR_VERSION_ID",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "YOUR_INSTANCE_ID"
+  },
+  "id": "YOUR_WORKFLOW_ID",
+  "tags": []
+}
